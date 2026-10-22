@@ -1,4 +1,4 @@
-"""第1回: 素のLLMに1回だけ質問するスクリプト。
+"""第1回: 複数モデルに同じ質問をするスクリプト。
 
 使い方:
     uv run python -m app.ask "LoRAとは何ですか？"
@@ -11,22 +11,33 @@
 """
 
 import argparse
+import time
 
 from google import genai
 from google.genai import errors
 
-from app.config import MODEL, api_error_message, get_api_key
+from app.config import api_error_message, get_api_key
 
 # 講座に固有の質問。正しい答えは data/glossary.json の homework-levels にある
 DEFAULT_QUESTION = "AIE2026の講座の宿題にある「3レベル」とは何ですか？"
+MODELS = ("gemini-3.5-flash", "gemini-3.5-flash-lite")
 
 
-def ask(question: str) -> str:
+def ask(question: str, model: str) -> str:
     client = genai.Client(api_key=get_api_key())
-    response = client.models.generate_content(model=MODEL, contents=question)
+    started_at = time.perf_counter()
+    response = client.models.generate_content(model=model, contents=question)
+    elapsed = time.perf_counter() - started_at
 
-    # TODO(第1回 演習): response.usage_metadata から
-    #   入力トークン数と出力トークン数を表示してみよう（Copilotに頼んでよい）
+    print(f"[response time] {elapsed:.2f} 秒")
+    usage = response.usage_metadata
+    if usage is None:
+        print("[usage] トークン数を取得できませんでした")
+    else:
+        print(
+            f"[usage] 入力トークン数: {usage.prompt_token_count}, "
+            f"出力トークン数: {usage.candidates_token_count}"
+        )
 
     return response.text
 
@@ -36,12 +47,17 @@ def main() -> None:
     parser.add_argument("question", nargs="?", default=DEFAULT_QUESTION)
     args = parser.parse_args()
 
-    print(f"[model] {MODEL}")
     print(f"[質問] {args.question}\n")
-    try:
-        print(ask(args.question))
-    except errors.APIError as e:
-        print(api_error_message(e.code, e.message))
+    failed = False
+    for model in MODELS:
+        print(f"--- [model] {model} ---")
+        try:
+            print(ask(args.question, model))
+        except errors.APIError as e:
+            print(api_error_message(e.code, e.message))
+            failed = True
+        print()
+    if failed:
         raise SystemExit(1)
 
 
