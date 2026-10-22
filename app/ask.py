@@ -20,7 +20,7 @@ from app.config import api_error_message, get_api_key
 
 # 講座に固有の質問。正しい答えは data/glossary.json の homework-levels にある
 DEFAULT_QUESTION = "AIE2026の講座の宿題にある「3レベル」とは何ですか？"
-MODELS = ("gemini-3.1-pro-preview",)
+MODELS = ("gemini-3.5-flash", "gemini-3.5-flash-lite")
 
 
 def ask(question: str, model: str) -> str:
