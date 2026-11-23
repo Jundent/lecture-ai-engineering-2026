@@ -42,6 +42,33 @@ def test_built_index_can_be_searched(materials, monkeypatch):
     assert hits[0]["distance"] == pytest.approx(0)
 
 
+def test_search_with_neighbors_adds_adjacent_pages_once(monkeypatch):
+    pages = [
+        {"page_id": f"lec01-main-p00{number}", "document_id": "lec01-main",
+         "page": number, "content": f"本文{number}"}
+        for number in range(1, 5)
+    ]
+    pages.append({
+        "page_id": "lec02-main-p001", "document_id": "lec02-main",
+        "page": 1, "content": "別資料の本文",
+    })
+    hits = [
+        {"page_id": "lec01-main-p002", "document_id": "lec01-main", "distance": 0.1},
+        {"page_id": "lec01-main-p003", "document_id": "lec01-main", "distance": 0.2},
+    ]
+    monkeypatch.setattr(retrieval, "search", lambda _: hits)
+    monkeypatch.setattr(retrieval, "load_pages", lambda _: pages)
+
+    results = retrieval.search_with_neighbors("質問")
+
+    assert [page["page_id"] for page in results] == [
+        "lec01-main-p002", "lec01-main-p003", "lec01-main-p001", "lec01-main-p004",
+    ]
+    assert results[2]["retrieved_via"] == "adjacent"
+    assert results[2]["adjacent_to"] == "lec01-main-p002"
+    assert all(page["page_id"] != "lec02-main-p001" for page in results)
+
+
 def test_existing_index_survives_failed_rebuild(materials):
     source, database = materials
     build_index(source, database, embedder=lambda *_: [1, 0])
