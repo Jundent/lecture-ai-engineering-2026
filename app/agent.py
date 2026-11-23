@@ -5,6 +5,7 @@
     uv run python -m app.agent --trace "LoRAとQLoRAの違いは？"   # ツール呼び出しを表示
     uv run python -m app.agent --graph --trace "LoRAとQLoRAの違いは？"  # 検索からグラフをたどって回答
     uv run python -m app.agent --tree --trace "LoRAとQLoRAの違いは？"  # 目次をたどって回答
+    uv run python -m app.agent --neighbors --trace "LoRAとQLoRAの違いは？"  # 検索結果に前後ページを追加
     uv run python -m app.agent --full-context --trace "LoRAとQLoRAの違いは？"  # 全資料を一度に渡す
     uv run python -m app.agent --mcp --trace "LoRAとは？"        # 第5回: ツールを MCP サーバーから受け取る
     uv run python -m app.agent --mcp --list-tools               # 第5回: モデルに見えるツール一覧（APIキー不要）
@@ -36,7 +37,7 @@ from app.config import MODEL, api_error_message, get_api_key
 
 INSTRUCTIONS = """\
 あなたはAIエンジニアリング講座（AIE2026）の学習支援エージェントです。
-- 対象は第1〜3回の本講義資料。講義内容に答える前に必ず search_materials を使う。
+- 対象は第1〜3回の本講義資料。講義内容に答える前に必ず提供された検索ツールを使う。
 - 複数の話題や回を組み合わせる質問では、必要に応じて検索を分けて根拠を集める。
 - 回答は取得した本文が裏付ける範囲に限定し、知識だけで穴埋めしない。
 - 距離は正答の確率ではない。資料が返っても答えがなければ、確認できないと伝える。
@@ -181,6 +182,7 @@ def main() -> None:
     modes.add_argument("--mcp", action="store_true", help="第5回: ツールを MCP サーバー（app/mcp_servers.json）から受け取る")
     modes.add_argument("--graph", action="store_true", help="検索結果からグラフをたどり、候補ページを読んで答える")
     modes.add_argument("--tree", action="store_true", help="目次をたどり、必要なページを読んで答える")
+    modes.add_argument("--neighbors", action="store_true", help="検索結果に同じ資料内の前後ページを追加して答える")
     modes.add_argument("--full-context", action="store_true", help="検索せず、lectures.jsonの全資料を一度に渡す")
     parser.add_argument("--list-tools", action="store_true", help="モデルに見えるツール一覧を表示して終了する（APIキー不要）")
     args = parser.parse_args()
@@ -191,6 +193,8 @@ def main() -> None:
         mode = target.override(instructions=TREE_INSTRUCTIONS, tools=[tools.browse_tree])
     elif args.graph:
         mode = target.override(instructions=GRAPH_INSTRUCTIONS, tools=[tools.search_graph])
+    elif args.neighbors:
+        mode = target.override(tools=[tools.search_materials_with_neighbors])
     with mode:
         if args.list_tools:
             if args.full_context:

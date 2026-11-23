@@ -11,7 +11,8 @@ from pydantic_ai import DeferredToolRequests
 from pydantic_ai.messages import ToolCallPart, ToolReturnPart
 from pydantic_ai.models.test import TestModel
 
-from app.agent import agent
+from app import tools
+from app.agent import INSTRUCTIONS, agent
 
 BASE_TOOLS = {"search_materials"}
 
@@ -45,4 +46,19 @@ def test_material_result_reaches_the_model(monkeypatch):
         result = agent.run_sync("RAGとは？")
     returns = _parts(result, ToolReturnPart)
     assert returns and returns[0].tool_name == "search_materials"
+    assert json.loads(returns[0].content)["results"] == [hit]
+
+
+def test_neighbor_material_result_reaches_the_model(monkeypatch):
+    hit = {"page_id": "lec02-main-p052", "retrieved_via": "adjacent"}
+    monkeypatch.setattr("app.retrieval.search_with_neighbors", lambda _: [hit])
+    model = TestModel(call_tools=["search_materials_with_neighbors"])
+    with agent.override(
+        instructions=INSTRUCTIONS,
+        tools=[tools.search_materials_with_neighbors],
+        model=model,
+    ):
+        result = agent.run_sync("RAGとは？")
+    returns = _parts(result, ToolReturnPart)
+    assert returns and returns[0].tool_name == "search_materials_with_neighbors"
     assert json.loads(returns[0].content)["results"] == [hit]
